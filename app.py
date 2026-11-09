@@ -27,10 +27,8 @@ if prompt := st.chat_input("Ask a question about the book..."):
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             try:
-                response = requests.post(
-                    "http://127.0.0.1:8000/chat",
-                    json={"question": prompt}
-                )
+                response = requests.post("http://host.docker.internal:8000/chat", json={"question": prompt})
+                
                 response_data = response.json()
 
                 if response.status_code == 200:

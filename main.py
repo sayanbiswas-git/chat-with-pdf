@@ -4,6 +4,7 @@ from google import genai
 import chromadb
 import os
 from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
 
 # --- SETUP & CONNECTIONS ---
 load_dotenv()
@@ -19,6 +20,14 @@ collection = chroma_client.get_collection(name="book_collection")
 
 # 3. Initialize FastAPI App
 app = FastAPI(title="Chat with PDF API")
+# Add this right below app = FastAPI(title="Chat with PDF API")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # For development, this allows any website to talk to your API
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # --- DATA MODELS ---
 class ChatRequest(BaseModel):
