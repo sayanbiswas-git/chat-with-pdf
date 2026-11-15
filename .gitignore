@@ -1,6 +1,16 @@
+# Python environment
 venv/
 __pycache__/
-*.pyc
+
+# Secrets
 .env
+
+# Databases & AI Models (These are HUGE files)
+*.db
 chroma_db/
-test.pdf
+chat_sessions.db
+flashrank_cache/
+
+# React Frontend (This is 50,000 files!)
+frontend/node_modules/
+frontend/dist/
