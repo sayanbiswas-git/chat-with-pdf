@@ -6,13 +6,15 @@ import os
 import time
 from dotenv import load_dotenv
 from flashrank import Ranker, RerankRequest
-from sqlalchemy import create_engine, Column, String
+from sqlalchemy import create_engine, Column, String, Integer
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 import uuid
 import io
 from pypdf import PdfReader
 from sentence_transformers import SentenceTransformer
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+import json
 
 
 load_dotenv()
@@ -32,6 +34,13 @@ class ChatsessionDB(Base):
     __tablename__ = "chats"
     id = Column(String, primary_key=True, index=True)
     title = Column(String)
+
+class MessageDB(Base):
+    __tablename__ = "messages"
+    id = Column(Integer, primary_key=True, index=True)
+    chat_id = Column(String, index=True)
+    role= Column(String)
+    content= Column(String)
 
 Base.metadata.create_all(bind=engine)
 
@@ -72,6 +81,72 @@ class QueryResponse(BaseModel):
     sources: list[str]
 
 # ENDPOINTS 
+@app.get("/chats/{chat_id}/messages")
+def get_chat_messages(chat_id: str, db: Session = Depends(get_db)):
+    messages = db.query(MessageDB).filter(MessageDB.chat_id == chat_id).order_by(MessageDB.id).all()
+    return [{"role": m.role, "content": m.content} for m in messages]
+
+@app.post("/chat/{chat_id}")
+def chat_with_pdf(chat_id: str, request: QueryRequest, db: Session = Depends(get_db)):
+
+    user_msg = MessageDB(chat_id=chat_id, role="user", content=request.question)
+    db.add(user_msg)
+    db.commit()
+
+    query_embedding = embedding_model.encode([request.question])[0].tolist()
+
+    results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=15,
+        where={"chat_id": chat_id}
+    )
+
+    if not results['documents'][0]:
+        
+        def error_stream():
+            yield "I couldn't find any documents in this chat."
+        return StreamingResponse(error_stream(), media_type="text/plain")
+
+    retrieved_chunks = results['documents'][0]
+    passages = [{"id": str(i), "text": chunk} for i, chunk in enumerate(retrieved_chunks)]
+    rerank_request = RerankRequest(query=request.question, passages=passages)
+    rerank_results = ranker.rerank(rerank_request)
+    top_3_chunks = [result["text"] for result in rerank_results[:3]]
+
+    context_text = "\n\n---\n\n".join(top_3_chunks)
+    prompt = f"""
+Use the provided context to answer the user's question.
+If the answer is not in the context, say "I don't know based on the provided document."
+
+CONTEXT: {context_text}
+QUESTION: {request.question}"""
+
+    
+    def stream_generator():
+        full_response = ""
+        try:
+            
+            response = ai_client.models.generate_content_stream(
+                model="gemini-3.5-flash",
+                contents=prompt
+            )
+            for chunk in response:
+                if chunk.text:
+                    full_response += chunk.text
+                    yield chunk.text 
+        except Exception as e:
+            yield f"\n[Error: {e}]"
+        finally:
+           
+            ai_msg = MessageDB(chat_id=chat_id, role="ai", content=full_response)
+            db.add(ai_msg)
+            db.commit()
+            
+            
+            yield f"\n\n__SOURCES__{json.dumps(top_3_chunks)}"
+
+    return StreamingResponse(stream_generator(), media_type="text/plain")
+
 @app.get("/")
 def home():
     return {"messsage": "Chat with PDF API is running"}
@@ -104,7 +179,7 @@ async def upload_pdf(chat_id: str, file: UploadFile = File(...)):
 
     chunks = [full_text[i:i+1000]for i in range(0, len(full_text), 800)]
 
-        # Batch embed and upload
+        
     batch_size = 32 
     for i in range(0, len(chunks), batch_size):
         batch_chunks = chunks[i:i+batch_size]
@@ -187,7 +262,7 @@ CONTEXT: {context_text}
 QUESTION: {request.question}"""
 
     response = ai_client.models.generate_content(
-        model="gemini-3.8-flash", # Changed to 2.5 just to be safe, but 3.5 is fine if it works!
+        model="gemini-3.5-flash", # Changed to 2.5 just to be safe, but 3.5 is fine if it works!
         contents=prompt
     )
 

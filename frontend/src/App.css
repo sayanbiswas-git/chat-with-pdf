@@ -140,10 +140,36 @@ body {
   background-color: var(--bg-main);
 }
 
+/* Top Bar */
 .top-bar {
   padding: 16px 24px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between; /* Pushes elements to opposite sides */
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.file-indicator-container {
+  flex: 1;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.file-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--bg-sidebar);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .upload-btn {
@@ -154,6 +180,7 @@ body {
   cursor: pointer;
   font-size: 0.85rem;
   font-weight: 500;
+  margin-left: auto; /* Pushes it to the far right */
 }
 
 .upload-btn:hover {
@@ -325,4 +352,23 @@ body {
   background-color: var(--border);
   color: var(--text-muted);
   cursor: not-allowed;
+}
+
+/* Markdown Styling */
+.message-content p {
+  margin-bottom: 10px;
+}
+.message-content p:last-child {
+  margin-bottom: 0;
+}
+.message-content ul, .message-content ol {
+  margin-left: 20px;
+  margin-bottom: 10px;
+}
+.message-content li {
+  margin-bottom: 4px;
+}
+.message-content strong {
+  font-weight: 600;
+  color: var(--text-main);
 }
